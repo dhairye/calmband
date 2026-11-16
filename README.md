@@ -1,4 +1,4 @@
-# CalmBand (Forerunner 165)
+# CalmBand
 
 On-watch "why is my heart rate up?" classifier + paced-breathing haptics.
 
