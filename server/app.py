@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request  # noqa: E402
-from fastapi.responses import HTMLResponse, StreamingResponse  # noqa: E402
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse  # noqa: E402
 
 import agent  # noqa: E402
 
@@ -383,6 +383,12 @@ def _page() -> HTMLResponse:
 @app.get("/live", response_class=HTMLResponse)
 async def live_page():
     return _page()
+
+
+# The bare address opens the live page.
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse("/live")
 
 
 @app.get("/live/state")
