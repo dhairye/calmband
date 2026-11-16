@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalmBand Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f5f7; --card: #ffffff; --ink: #1d1d1f; --muted: #86868b; --line: #e8e8ed; --grid: #d9d9de;
+    --heart: #ff2d55; --calm: #30c27d; --active: #0a84ff; --anx: #ff9f0a; --night: #8e8ce0; --exc: #e8be2c; --rec: #32ade6;
+    --accent: #ff6b35;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif;
+         -webkit-font-smoothing: antialiased; }
+
+  /* ---------- hero: the watch, full screen ---------- */
+  .hero { position: relative; height: 100vh; min-height: 560px;
+          background: radial-gradient(120% 90% at 50% 40%, #ffffff 0%, #f5f5f7 62%, #ececf0 100%); }
+  .hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  .hero canvas:active { cursor: grabbing; }
+  .corner { position: absolute; top: 22px; z-index: 2; font-size: 14px; }
+  .brand { left: 28px; font-weight: 600; letter-spacing: -.01em; font-size: 17px; }
+  .live { right: 28px; display: flex; align-items: center; gap: 7px; color: var(--muted); font-weight: 500; font-size: 13px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #c7c7cc; }
+  .dot.on { background: #34c759; }
+  /* vibration lines: three arcs per side that ripple outward while the watch buzzes */
+  .buzz { position: absolute; left: 0; top: 0; width: 44px; height: 88px; z-index: 1; pointer-events: none;
+          opacity: 0; transition: opacity .18s ease; overflow: visible; }
+  .buzz path { fill: none; stroke: #1d1d1f; stroke-width: 2.4; stroke-linecap: round; opacity: 0; }
+  .buzz.on path { animation: ripple .9s ease-out infinite; }
+  .buzz.on path:nth-child(2) { animation-delay: .12s; }
+  .buzz.on path:nth-child(3) { animation-delay: .24s; }
+  .buzz.alert path { stroke: #ff6b35; animation-duration: .45s; }
+  @keyframes ripple { 0% { opacity: 0; } 30% { opacity: .85; } 100% { opacity: 0; } }
+  .floor { position: absolute; left: 50%; bottom: 13%; width: 300px; height: 34px; transform: translateX(-50%);
+           background: radial-gradient(ellipse at center, rgba(0,0,0,.16), rgba(0,0,0,0) 70%); pointer-events: none; }
+  .below { position: absolute; left: 0; right: 0; bottom: 26px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .swatch-row { display: flex; gap: 12px; }
+  .swatch { width: 16px; height: 16px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); outline-offset: 3px; }
+  .swatch.sel { outline: 2px solid #1d1d1f; }
+  .swatch-name { font-size: 12px; color: var(--muted); }
+  .scroll { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; text-decoration: none; }
+  .scroll svg { width: 12px; height: 12px; }
+
+  /* ---------- details ---------- */
+  section.details { max-width: 1120px; margin: 0 auto; padding: 56px 32px 72px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  /* restrained: ink + grays, one muted accent for heart rate, no colour coding in the cards */
+  .card { background: var(--card); border-radius: 20px; padding: 26px 28px 24px; }
+  .card.wide { grid-column: 1 / -1; }
+  .eyebrow { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: -.005em; }
+  .big { display: flex; align-items: baseline; gap: 6px; margin-top: 8px; }
+  .big .n { font-size: 48px; font-weight: 600; letter-spacing: -.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .big .u { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .meta { margin-top: 6px; color: var(--muted); font-size: 13px; }
+  svg.chart { display: block; width: 100%; margin-top: 18px; overflow: visible; }
+  .chart text { font: 400 11px Inter, -apple-system, system-ui, sans-serif; fill: #a1a1a6; }
+
+  .ranks { margin-top: 18px; display: grid; gap: 12px; }
+  .rank { display: grid; grid-template-columns: 92px 1fr 40px; align-items: center; gap: 14px; font-size: 14px; color: var(--muted); }
+  .rank .bar { height: 4px; background: #f0f0f2; border-radius: 2px; overflow: hidden; }
+  .rank .bar i { display: block; height: 100%; background: #c7c7cc; border-radius: 2px; transition: width .7s cubic-bezier(.2,.7,.2,1); }
+  .rank b { font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+  .rank.top { color: var(--ink); }
+  .rank.top .bar i { background: var(--ink); }
+  .status { margin-top: 20px; font-size: 13px; color: var(--muted); min-height: 18px; }
+
+  .list { list-style: none; margin-top: 16px; }
+  .list li { display: grid; grid-template-columns: 74px 1fr auto; align-items: baseline; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .list li:first-child { border-top: 0; }
+  .list .t { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .list .d { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-size: 15px; padding: 14px 0 4px; }
+
+  .support { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-top: 8px; }
+  .support .n { font-size: 32px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+  .state-tag { font-size: 14px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+  .state-tag.hot { color: var(--ink); }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 24px 40px; }
+
+  @media (max-width: 820px) {
+    .grid { grid-template-columns: 1fr; }
+    section.details { padding: 36px 16px 56px; }
+    .corner.brand { left: 16px; } .corner.live { right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<section class="hero" aria-label="Live CalmBand watch">
+  <div class="corner brand">CalmBand</div>
+  <canvas id="gl"></canvas>
+  <!-- vibration lines, placed beside the watch case each frame -->
+  <svg class="buzz" id="buzzL" viewBox="0 0 40 80" aria-hidden="true"><path d="M30 26 Q22 40 30 54"/><path d="M20 18 Q8 40 20 62"/><path d="M10 10 Q-6 40 10 70"/></svg>
+  <svg class="buzz" id="buzzR" viewBox="0 0 40 80" aria-hidden="true"><path d="M10 26 Q18 40 10 54"/><path d="M20 18 Q32 40 20 62"/><path d="M30 10 Q46 40 30 70"/></svg>
+  <div class="floor"></div>
+  <div class="below">
+    <div class="swatch-row" id="swatches"></div>
+    <div class="swatch-name" id="swatchName"></div>
+    <a class="scroll" href="#details">Live details
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg></a>
+  </div>
+</section>
+
+<section class="details" id="details">
+  <div class="grid">
+    <div class="card wide">
+      <div class="eyebrow">Heart rate</div>
+      <div class="big"><span class="n" id="hrNum">--</span><span class="u">BPM</span></div>
+      <div class="meta" id="hrMeta">Waiting for the watch</div>
+      <svg class="chart" id="hrChart" height="180" role="img" aria-label="Heart rate over the last three minutes"></svg>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Right now</div>
+      <div class="big"><span class="n" id="stateName" style="font-size: 36px">—</span></div>
+      <div class="meta" id="stateConf">&nbsp;</div>
+      <div class="ranks" id="ranks"></div>
+      <div class="status" id="statusLine"></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">Today</div>
+      <svg class="chart" id="dayChart" height="52" role="img" aria-label="Today's events on a 24 hour timeline"></svg>
+      <ul class="list" id="log"></ul>
+    </div>
+
+    <div class="card wide">
+      <div class="eyebrow">Support line</div>
+      <div class="support"><span class="n" id="supportNum">—</span><span class="state-tag" id="supportPill">Standing by</span></div>
+      <div class="meta">Calls reach CalmBand's AI coach. Afterward, a summary goes to the therapist and a check-in to a trusted friend.</div>
+    </div>
+  </div>
+</section>
+
+<footer>CalmBand is a hackathon prototype, not a medical device. Readings are wrist-sensor estimates.</footer>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+
+// index 6 = TREMOR, the Parkinson's-mode stage (only when that setting is on)
+const NAMES = ["CALM", "ACTIVE", "ANXIETY", "NIGHTMARE", "EXCITED", "RECOVERING", "TREMOR"];
+const WATCH_COLORS = ["#3DDC97", "#4DA3FF", "#FFA630", "#A678FF", "#FFD93D", "#5ED3F3", "#F472B6"];   // as on the watch
+const TREMOR = 6;
+const SVGNS = "http://www.w3.org/2000/svg";
+let latest = null;
+
+const title = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+const pretty = (n) => (n && n.length === 12 && n.startsWith("+1")) ? `(${n.slice(2, 5)}) ${n.slice(5, 8)}-${n.slice(8)}` : (n || "—");
+function dim(hex, f) {
+  const v = parseInt(hex.slice(1), 16), c = (s) => Math.round(((v >> s) & 255) * f);
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
+}
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+// ================================================================ the watch screen (mirrors CalmView.mc, all four screens)
+const screen = document.createElement("canvas");
+screen.width = screen.height = 768;
+const sx = screen.getContext("2d");
+// watch font sizes, as fractions of the screen height
+const F_XTINY = 0.052, F_TINY = 0.062, F_SMALL = 0.072;
+const LOG_DOT = { anxiety: "#FFA630", exercise: "#4DA3FF", "support alert": "#FF8A5C", nightmare: "#8FA3B8", tremor: "#F472B6", excited: "#FFD93D" };
+let pagePos = 0;                                               // eased toward the watch's current screen
+
+function text(str, x, y, size, color, weight = 400, align = "center", base = "middle") {
+  sx.font = `${weight} ${size}px Inter, "SF Pro Display", system-ui, sans-serif`;
+  sx.fillStyle = color; sx.textAlign = align; sx.textBaseline = base; sx.fillText(str, x, y);
+}
+
+function drawScreen(s, online, log) {
+  const w = screen.width, h = screen.height;
+  sx.fillStyle = "#000"; sx.fillRect(0, 0, w, h);
+  if (!online || !s || !s.p) { text("--", w / 2, h * 0.42, h * 0.17, "#fff", 600); text("watch offline", w / 2, h * 0.6, h * F_XTINY, "#8a8a8a"); return; }
+  if (s.nudge) { drawNudge(s); return; }
+  pagePos += ((s.page || 0) - pagePos) * 0.18;                // the same slide as on the watch
+  if (Math.abs((s.page || 0) - pagePos) < 0.002) pagePos = s.page || 0;
+  const pages = [drawMain, drawLegend, drawLogs, drawSettings];
+  pages.forEach((fn, i) => {
+    const oy = (i - pagePos) * h;
+    if (oy > -h && oy < h) { sx.save(); sx.translate(0, oy); fn(s, w, h, log); sx.restore(); }
+  });
+  const x = w * 0.925, gap = h * 24 / 390, y0 = h / 2 - gap * 1.5, r = h * 4 / 390;   // page dots
+  sx.fillStyle = "#3A3A3A"; for (let i = 0; i < 4; i++) { sx.beginPath(); sx.arc(x, y0 + gap * i, r, 0, Math.PI * 2); sx.fill(); }
+  sx.fillStyle = "#fff"; sx.beginPath(); sx.arc(x, y0 + gap * pagePos, r, 0, Math.PI * 2); sx.fill();
+}
+
+function drawMain(s, w, h) {
+  const cx = w / 2, cy = h / 2, top = s.st ?? 0, col = WATCH_COLORS[top] || "#3DDC97";
+  const tremor = top === TREMOR, live = tremor ? WATCH_COLORS[TREMOR] : "#3DDC97";
+  const conf = Math.min(0.995, ((tremor ? s.tp : s.p[top]) || 0) / 100), lw = w * 0.025, r = cx - lw;
+  sx.lineWidth = lw; sx.strokeStyle = "#1E1E1E"; sx.beginPath(); sx.arc(cx, cy, r, 0, Math.PI * 2); sx.stroke();
+  if (conf > 0.02) { sx.strokeStyle = col; sx.beginPath(); sx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * conf); sx.stroke(); }
+  text((s.mode || (s.sleep ? "SLEEP MODE" : "LIVE")) + (s.pd ? " + PD" : ""), cx, h * 0.15, h * F_XTINY, "#8a8a8a");
+  text(s.hr > 0 ? String(s.hr) : "--", cx, h * 0.38, h * 0.2, "#fff", 600);
+  text("bpm", cx, h * 0.54, h * F_XTINY * 0.85, "#8a8a8a");
+  text(NAMES[top] || "", cx, h * 0.65, h * F_SMALL, col, 500);
+  const bw = w * 0.42, bx = cx - bw / 2, by = h * 0.745, bh = h * 0.014;
+  sx.fillStyle = "#1E1E1E"; sx.fillRect(bx, by, bw, bh);
+  if (tremor) { sx.fillStyle = live; sx.fillRect(bx, by, bw * (s.tp || 0) / 100, bh); }
+  else { let x = bx; s.p.forEach((v, i) => { const sw = bw * v / 100; if (sw >= 1) { sx.fillStyle = WATCH_COLORS[i]; sx.fillRect(x, by, sw, bh); x += sw; } }); }
+  if (s.status) {
+    text(s.status, cx, h * 0.81, h * F_XTINY, s.countdown || s.showNumber ? "#FF8A5C" : (s.vib ? live : "#A0A0A0"));
+    if (s.showNumber) text(pretty(s.number), cx, h * 0.88, h * F_XTINY, "#FF8A5C");
+  }
+}
+
+function drawLegend(s, w, h) {
+  const keys = ["START", "DOWN", "UP", "BACK"], what = ["mark wrong", "snooze / next", "sleep mode", "exit & save"];
+  const cols = ["#FFD93D", "#FF8A5C", "#5ED3F3", "#8A8A8A"];
+  text("BUTTONS", w / 2, h * 0.17, h * F_XTINY, "#8A8A8A");
+  keys.forEach((k, i) => {
+    const y = h * (0.30 + 0.12 * i);
+    text(k, w * 0.36, y, h * F_TINY, cols[i], 400, "right"); text(what[i], w * 0.40, y, h * F_TINY, "#fff", 400, "left");
+  });
+  text("BACK to main screen", w / 2, h * 0.80, h * F_XTINY, "#6A6A6A");
+}
+
+function drawLogs(s, w, h, log) {
+  text("TODAY", w / 2, h * 0.17, h * F_XTINY, "#8A8A8A");
+  const list = log || [];
+  if (!list.length) { text("nothing logged yet", w / 2, h * 0.47, h * F_TINY, "#6A6A6A"); return; }
+  list.slice(-5).reverse().forEach((e, i) => {
+    const y = h * (0.30 + 0.105 * i), m = Math.floor((e.d || 0) / 60);
+    const dur = m < 1 ? "" : (m < 60 ? ` ${m}m` : ` ${Math.floor(m / 60)}h${m % 60 ? " " + (m % 60) + "m" : ""}`);
+    text(e.t || "", w * 0.40, y, h * F_XTINY, "#A0A0A0", 400, "right");
+    sx.fillStyle = LOG_DOT[e.k] || "#FFD93D"; sx.beginPath(); sx.arc(w * 0.44, y, h * 4 / 390, 0, Math.PI * 2); sx.fill();
+    text((e.k || "") + dur, w * 0.48, y, h * F_XTINY, "#fff", 400, "left");
+  });
+  if (list.length > 5) text(`+${list.length - 5} earlier`, w / 2, h * 0.84, h * F_XTINY, "#6A6A6A");
+}
+
+function drawSettings(s, w, h) {
+  text("SETTINGS", w / 2, h * 0.17, h * F_XTINY, "#8A8A8A");
+  text("Parkinson's", w * 0.14, h * 0.33, h * F_TINY, "#fff", 400, "left");
+  const pw = w * 0.22, ph = h * 0.085, px = w * 0.86 - pw, py = h * 0.33 - ph / 2;
+  sx.fillStyle = s.pd ? "#3DDC97" : "#3A3A3A"; sx.beginPath(); sx.roundRect(px, py, pw, ph, ph / 2); sx.fill();
+  text(s.pd ? "ON" : "OFF", px + pw / 2, h * 0.33, h * F_XTINY, s.pd ? "#000" : "#A0A0A0");
+  text("START to toggle", w / 2, h * 0.415, h * F_XTINY, "#6A6A6A");
+  const num = (n) => (n ? pretty(n) : "not set");
+  text("Therapist", w / 2, h * 0.53, h * F_XTINY, "#8A8A8A"); text(num(s.ther), w / 2, h * 0.595, h * F_TINY, "#fff");
+  text("Emergency contact", w / 2, h * 0.69, h * F_XTINY, "#8A8A8A"); text(num(s.emer), w / 2, h * 0.755, h * F_TINY, "#FF5468");
+}
+
+function drawNudge(s) {
+  const w = screen.width, h = screen.height, cx = w / 2, cy = h / 2, accent = "#FF8A5C";
+  const phase = Math.floor(Date.now() / 1000) % 4, swell = phase < 2 ? phase : 4 - phase;
+  sx.fillStyle = "#2A170D"; sx.beginPath(); sx.arc(cx, cy, w * 0.30 + w * 0.025 * swell, 0, Math.PI * 2); sx.fill();
+  sx.lineWidth = w * 0.025; sx.strokeStyle = accent; sx.beginPath(); sx.arc(cx, cy, cx - w * 0.025, 0, Math.PI * 2); sx.stroke();
+  text("TAKE A MOMENT", cx, h * 0.21, h * F_XTINY, "#A0A0A0");
+  text("Call CalmBand", cx, h * 0.34, h * 0.078, "#fff", 500);
+  text(pretty(s.number), cx, h * 0.455, h * F_SMALL, accent);
+  text("your heart rate has", cx, h * 0.565, h * F_XTINY, "#A0A0A0"); text("been up for a while", cx, h * 0.635, h * F_XTINY, "#A0A0A0");
+  text("START", w * 0.42, h * 0.755, h * F_XTINY, "#fff", 400, "right"); text("DOWN", w * 0.42, h * 0.835, h * F_XTINY, "#fff", 400, "right");
+  text("I'm calling", w * 0.46, h * 0.755, h * F_XTINY, "#A0A0A0", 400, "left"); text("not now", w * 0.46, h * 0.835, h * F_XTINY, "#A0A0A0", 400, "left");
+}
+
+// ================================================================ 3D watch
+const canvas = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
+const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(3, 4, 6); scene.add(key);
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+const watch = new THREE.Group(); scene.add(watch);
+const caseMat = new THREE.MeshPhysicalMaterial({ color: 0x2b2d31, metalness: 0.35, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25 });
+const bezelMat = new THREE.MeshPhysicalMaterial({ color: 0x17181b, metalness: 0.5, roughness: 0.3, clearcoat: 0.8 });
+const btnMat = new THREE.MeshPhysicalMaterial({ color: 0x9a9da3, metalness: 0.9, roughness: 0.25 });
+const bandMat = new THREE.MeshPhysicalMaterial({ color: 0x26282b, metalness: 0, roughness: 0.9, envMapIntensity: 0.5 });
+
+const caseMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.16, 0.46, 128, 1), caseMat);
+caseMesh.rotation.x = Math.PI / 2; watch.add(caseMesh);
+const back = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.12, 96), caseMat);
+back.rotation.x = Math.PI / 2; back.position.z = -0.28; watch.add(back);
+const bezel = new THREE.Mesh(new THREE.TorusGeometry(1.11, 0.075, 32, 160), bezelMat); bezel.position.z = 0.235; watch.add(bezel);
+const screenTex = new THREE.CanvasTexture(screen); screenTex.colorSpace = THREE.SRGBColorSpace; screenTex.anisotropy = 8;
+const face = new THREE.Mesh(new THREE.CircleGeometry(1.04, 160), new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }));
+face.position.z = 0.236; watch.add(face);
+const glass = new THREE.Mesh(new THREE.CircleGeometry(1.1, 160),
+  new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.06, roughness: 0.02, clearcoat: 1 }));
+glass.position.z = 0.25; watch.add(glass);
+for (const deg of [35, -35, 145, 180, 215]) {               // START, BACK, LIGHT, UP, DOWN
+  const a = THREE.MathUtils.degToRad(deg);
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.2, 32), btnMat);
+  b.position.set(Math.cos(a) * 1.23, Math.sin(a) * 1.23, 0.02); b.rotation.z = a - Math.PI / 2; watch.add(b);
+}
+function strap(dir) {                                        // short overlapping pieces = one smooth band
+  let y = dir * 0.95, z = -0.06, ang = 0; const seg = 0.12;
+  for (let i = 0; i < 22; i++) {
+    const m = new THREE.Mesh(new RoundedBoxGeometry(1.1, seg + 0.1, 0.15, 2, 0.05), bandMat);
+    const ny = y + dir * Math.cos(ang) * seg, nz = z - Math.sin(ang) * seg;
+    m.position.set(0, (y + ny) / 2, (z + nz) / 2); m.rotation.x = dir * ang; watch.add(m);
+    y = ny; z = nz; ang += 0.065;
+  }
+}
+strap(1); strap(-1);
+
+const BANDS = [
+  { name: "Black", band: 0x26282b, kase: 0x2b2d31, css: "#2b2d31" },
+  { name: "Whitestone", band: 0xe9e5dc, kase: 0xd8d4cc, css: "#e9e5dc" },
+  { name: "Mist Gray", band: 0xaeb3b9, kase: 0x8e9399, css: "#aeb3b9" },
+  { name: "Berry", band: 0x7d2f4b, kase: 0x5b2236, css: "#7d2f4b" },
+];
+const swatches = document.getElementById("swatches");
+BANDS.forEach((b, i) => {
+  const e = document.createElement("button");
+  e.className = "swatch"; e.style.background = b.css; e.title = b.name; e.setAttribute("aria-label", b.name);
+  e.onclick = () => pickBand(i); swatches.appendChild(e);
+});
+function pickBand(i) {
+  bandMat.color.setHex(BANDS[i].band); caseMat.color.setHex(BANDS[i].kase);
+  [...swatches.children].forEach((e, j) => e.classList.toggle("sel", i === j));
+  document.getElementById("swatchName").textContent = BANDS[i].name;
+}
+pickBand(0);
+
+let drag = null, yaw = 0, pitch = 0, userYaw = 0, userPitch = 0, lastTouch = 0;
+canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, yaw: userYaw, pitch: userPitch }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  userYaw = drag.yaw + (e.clientX - drag.x) * 0.008;
+  userPitch = THREE.MathUtils.clamp(drag.pitch + (e.clientY - drag.y) * 0.006, -0.6, 0.6);
+  lastTouch = performance.now();
+});
+canvas.addEventListener("pointerup", () => { drag = null; lastTouch = performance.now(); });
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  // keep the whole watch (straps included) comfortably in frame whatever the window shape
+  // (a little extra height leaves room for the colour dots under the watch)
+  const needH = 7.3, needW = 3.6, vfov = THREE.MathUtils.degToRad(camera.fov);
+  const distH = (needH / 2) / Math.tan(vfov / 2), distW = (needW / 2) / (Math.tan(vfov / 2) * camera.aspect);
+  camera.position.set(0, -0.45, Math.max(distH, distW));
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+
+// ---- haptics: when the real watch vibrates, the model shakes and lines ripple beside it ----
+const buzzL = document.getElementById("buzzL"), buzzR = document.getElementById("buzzR");
+const tmpV = new THREE.Vector3();
+function hapticEnvelope(s, online, t) {
+  // returns [strength 0..1, kind] matching the watch's actual vibration patterns
+  if (!online || !s) return [0, ""];
+  if (s.countdown) {                                         // triple buzz every 3 s ("support in 10s")
+    const m = t % 3000; return [m < 1350 && (m % 450) < 300 ? 1 : 0, "alert"];
+  }
+  if (s.vib && s.pulse === "tremor") return [(t % 1000) < 250 ? 0.7 : 0, "tremor"];   // 250 ms pulses each second
+  if (s.vib) return [(t % 1000) < 700 ? 0.55 : 0, "breath"];                           // 700 ms pulses each second
+  return [0, ""];
+}
+function placeBuzz(elm, x) {
+  tmpV.set(x, 0, 0.1); watch.localToWorld(tmpV); tmpV.project(camera);
+  const r = canvas.getBoundingClientRect();
+  const px = (tmpV.x + 1) / 2 * r.width, py = (1 - tmpV.y) / 2 * r.height;
+  elm.style.transform = `translate(${px - 22}px, ${py - 44}px)`;
+}
+
+function frame(t) {
+  const idle = !drag && performance.now() - lastTouch > 2500;
+  if (idle) { userYaw *= 0.97; userPitch *= 0.97; }
+  yaw += (userYaw + (idle ? Math.sin(t / 2600) * 0.32 : 0) - yaw) * 0.08;
+  pitch += (userPitch - 0.06 + (idle ? Math.sin(t / 3400) * 0.05 : 0) - pitch) * 0.08;
+  const online = latest && latest.age !== null && latest.age < 12;
+  const [amp, kind] = hapticEnvelope(latest && latest.watch, online, t);
+  const A = amp * (kind === "alert" ? 0.035 : 0.014);         // a quick, small shimmer - not a cartoon wobble
+  watch.rotation.set(pitch, yaw, Math.sin(t * 0.13) * A * 0.7);
+  watch.position.set(Math.sin(t * 0.11) * A, Math.cos(t * 0.09) * A * 0.4, 0);
+  const active = kind !== "";
+  [buzzL, buzzR].forEach((b) => { b.classList.toggle("on", active); b.classList.toggle("alert", kind === "alert"); b.style.opacity = active ? 1 : 0; });
+  if (active) { placeBuzz(buzzL, -1.75); placeBuzz(buzzR, 1.75); }
+  drawScreen(latest && latest.watch, latest && latest.age !== null && latest.age < 12, latest && latest.log);
+  screenTex.needsUpdate = true;
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ================================================================ heart rate: one quiet line
+// A smoothed line over the last 3 minutes, a faint fill beneath it, a dashed average and a single
+// end-point marker. Ink is near-black; the only colour is a muted red on the line itself.
+function niceTicks(lo, hi) {
+  const step = hi - lo > 40 ? 20 : 10;
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, out = [];
+  for (let v = a; v <= b; v += step) out.push(v);
+  return out;
+}
+function smoothPath(pts) {                                    // Catmull-Rom -> cubic Bezier
+  if (pts.length < 2) return "";
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+}
+function drawHr(hist, online) {
+  const svg = document.getElementById("hrChart"); svg.innerHTML = "";
+  const W = svg.clientWidth || 600, H = 180, padR = 34, padB = 22, plotW = W - padR, plotH = H - padB - 8;
+  const now = Date.now() / 1000, span = 180;
+  // average every 5 s so the line is calm, not jittery
+  const bins = new Map();
+  (hist || []).forEach(([t, b]) => { if (t >= now - span) { const k = Math.floor(t / 5); const a = bins.get(k) || []; a.push(b); bins.set(k, a); } });
+  const series = [...bins.entries()].sort((a, b) => a[0] - b[0]).map(([k, a]) => [k * 5 + 2.5, a.reduce((s, v) => s + v, 0) / a.length]);
+  const raw = (hist || []).filter(([t]) => t >= now - span).map((p) => p[1]);
+  const lo = raw.length ? Math.min(...raw) - 4 : 60, hi = raw.length ? Math.max(...raw) + 4 : 100;
+  const ticks = niceTicks(lo, hi), y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const X = (t) => (t - (now - span)) / span * plotW, Y = (b) => 8 + plotH - (b - y0) / Math.max(1, y1 - y0) * plotH;
+
+  ticks.forEach((v) => {
+    el("line", { x1: 0, x2: plotW, y1: Y(v), y2: Y(v), stroke: "#ececf0", "stroke-width": 1 }, svg);
+    el("text", { x: W, y: Y(v) + 4, "text-anchor": "end" }, svg).textContent = v;
+  });
+  [["3 min", 0, "start"], ["2 min", plotW / 3, "middle"], ["1 min", plotW * 2 / 3, "middle"], ["Now", plotW, "end"]].forEach(([s, x, a]) =>
+    el("text", { x, y: H - 4, "text-anchor": a }, svg).textContent = s);
+
+  if (series.length >= 1) {
+    // break the line wherever the watch stopped sending (> 15 s), instead of drawing a fake bridge
+    const runs = [[]];
+    series.forEach(([t, b], i) => {
+      if (i && t - series[i - 1][0] > 15) runs.push([]);
+      runs[runs.length - 1].push([X(t), Y(b)]);
+    });
+    const defs = el("defs", {}, svg), g = el("linearGradient", { id: "hrFill", x1: 0, x2: 0, y1: 0, y2: 1 }, defs);
+    el("stop", { offset: "0%", "stop-color": "#c4314b", "stop-opacity": 0.10 }, g);
+    el("stop", { offset: "100%", "stop-color": "#c4314b", "stop-opacity": 0 }, g);
+    const avg = raw.reduce((s, v) => s + v, 0) / raw.length;
+    el("line", { x1: 0, x2: plotW, y1: Y(avg), y2: Y(avg), stroke: "#a1a1a6", "stroke-width": 1, "stroke-dasharray": "3 4" }, svg);
+    runs.filter((r) => r.length >= 2).forEach((pts) => {
+      const line = smoothPath(pts);
+      el("path", { d: `${line} L${pts[pts.length - 1][0]},${8 + plotH} L${pts[0][0]},${8 + plotH} Z`, fill: "url(#hrFill)" }, svg);
+      el("path", { d: line, fill: "none", stroke: "#c4314b", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
+    });
+    const last = runs[runs.length - 1], [ex, ey] = last[last.length - 1];
+    el("circle", { cx: ex, cy: ey, r: 4, fill: "#fff", stroke: "#c4314b", "stroke-width": 2 }, svg);
+  }
+  const meta = document.getElementById("hrMeta");
+  meta.textContent = raw.length
+    ? `Average ${Math.round(raw.reduce((s, v) => s + v, 0) / raw.length)} · range ${Math.min(...raw)}–${Math.max(...raw)} over the last 3 minutes`
+    : (online ? "Collecting…" : "Waiting for the watch");
+}
+
+// ================================================================ today: a quiet 24-hour strip
+function minutesOf(t) {                                       // "2:05 PM" -> minutes after midnight
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec((t || "").trim());
+  if (!m) return null;
+  let h = +m[1] % 12; if (m[3].toUpperCase() === "PM") h += 12;
+  return h * 60 + +m[2];
+}
+function drawDay(entries) {
+  const svg = document.getElementById("dayChart"); svg.innerHTML = "";
+  const W = svg.clientWidth || 400, H = 52, trackY = 4, trackH = 16, X = (min) => min / 1440 * W;
+  el("rect", { x: 0, y: trackY, width: W, height: trackH, rx: 4, fill: "#f2f2f4" }, svg);
+  (entries || []).forEach((e) => {
+    const start = minutesOf(e.t); if (start === null) return;
+    const w = Math.max(3, X((e.d || 0) / 60));
+    el("rect", { x: X(start), y: trackY, width: Math.min(w, W - X(start)), height: trackH, rx: 2, fill: "#1d1d1f", opacity: 0.85 }, svg);
+  });
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  el("line", { x1: X(nowMin), x2: X(nowMin), y1: trackY - 3, y2: trackY + trackH + 3, stroke: "#c4314b", "stroke-width": 1.5 }, svg);
+  [["12 AM", 0, "start"], ["6 AM", 360, "middle"], ["12 PM", 720, "middle"], ["6 PM", 1080, "middle"], ["12 AM", 1440, "end"]].forEach(([s, m, a]) =>
+    el("text", { x: X(m), y: H - 4, "text-anchor": a }, svg).textContent = s);
+}
+
+// ================================================================ cards
+const ranks = document.getElementById("ranks");
+
+function render(d) {
+  const online = d.age !== null && d.age < 12, s = d.watch || {};
+
+  document.getElementById("hrNum").textContent = online && s.hr > 0 ? s.hr : "--";
+  drawHr(d.hrHist, online);
+
+  // "Right now": states ranked by probability; only the top one is in ink
+  // with Parkinson's mode on, TREMOR joins the list (its value is the tremor detector's certainty)
+  const top = s.st ?? 0, p = (s.p || []).concat(s.pd ? [s.tp || 0] : []), has = online && p.length;
+  document.getElementById("stateName").textContent = has ? title(NAMES[top]) : "—";
+  document.getElementById("stateConf").textContent = has ? `${p[top]}% confidence` : " ";
+  const order = NAMES.slice(0, s.pd ? 7 : 6).map((n, i) => [i, has ? (p[i] || 0) : 0])
+    .sort((a, b) => (has ? (b[0] === top) - (a[0] === top) : 0) || b[1] - a[1]);   // the shown state first
+  ranks.innerHTML = "";
+  order.forEach(([i, v], k) => {
+    const row = document.createElement("div");
+    row.className = "rank" + (has && k === 0 ? " top" : "");
+    row.innerHTML = `<span></span><div class="bar"><i></i></div><b></b>`;
+    row.children[0].textContent = title(NAMES[i]);
+    row.querySelector("i").style.width = v + "%";
+    row.querySelector("b").textContent = v + "%";
+    ranks.appendChild(row);
+  });
+  const modeNote = s.mode === "SIM: ANXIETY" ? " · anxiety simulation" : (s.mode === "SLEEP MODE" ? " · sleep mode" : "");
+  document.getElementById("statusLine").textContent = online
+    ? (s.status || (s.vib ? "Calming vibration on" : "Monitoring")) + modeNote : "Watch offline";
+
+  drawDay(d.log);
+  const log = document.getElementById("log"); log.innerHTML = "";
+  const items = (d.log || []).slice().reverse().slice(0, 6);
+  if (!items.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "Nothing logged yet today."; log.appendChild(li); }
+  items.forEach((e) => {
+    const li = document.createElement("li"), mins = Math.round((e.d || 0) / 60);
+    li.innerHTML = `<span class="t"></span><span class="k"></span><span class="d"></span>`;
+    li.querySelector(".t").textContent = e.t || "";
+    li.querySelector(".k").textContent = title(e.k || "");
+    li.querySelector(".d").textContent = mins >= 1 ? `${mins} min` : "";
+    log.appendChild(li);
+  });
+
+  document.getElementById("supportNum").textContent = pretty(d.supportNumber);
+  const tag = document.getElementById("supportPill");
+  let label = "Standing by", hot = false;
+  if (d.inCall) { label = "On a call"; hot = true; }
+  else if (online && s.countdown) { label = "Alert in " + (s.status || "").replace(/\D+/g, "") + "s"; hot = true; }
+  else if (online && (s.nudge || s.showNumber)) { label = "Asking to call"; hot = true; }
+  tag.textContent = label; tag.className = "state-tag" + (hot ? " hot" : "");
+}
+addEventListener("resize", () => latest && render(latest));
+
+async function poll() {
+  try {
+    const r = await fetch(location.pathname.replace(/\/$/, "") + "/state", { cache: "no-store" });
+    if (r.ok) { latest = await r.json(); render(latest); }
+  } catch (e) { /* keep the last view; try again */ }
+  setTimeout(poll, 1000);
+}
+poll();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# build output
+bin/
+gen/
+internal-mir/
+external-mir/
+*.prg
+*.prg.debug.xml
+*.iq
+
+# signing key
+developer_key*
+*.der
+
+# your own settings: token, server URL, phone numbers (template: config/Config.example.mc)
+source/Config.mc
+
+# server secrets and local env
+server/.env
+server/.venv/
+__pycache__/
+*.pyc
