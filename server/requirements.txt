@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-twilio
-anthropic
-python-dotenv
-python-multipart
+fastapi==0.162.5
+uvicorn[standard]==0.54.0
+httpx2==2.14.0
+python-dotenv==1.2.4
+# optional: only used when ANTHROPIC_API_KEY is set
+anthropic==2.8.0

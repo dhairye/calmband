@@ -37,7 +37,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("calmband")
 
 # ---------------------------------------------------------------- config (from .env)
-PUBLIC_URL = os.environ.get("PUBLIC_URL", "").rstrip("/")         # https://<your tunnel>
+PUBLIC_URL = (os.environ.get("PUBLIC_URL")                       # https://<your tunnel>
+              or os.environ.get("RENDER_EXTERNAL_URL", "")).rstrip("/")  # set automatically on Render
 ALERT_TOKEN = os.environ.get("ALERT_TOKEN", "")                   # shared secret with the watch
 VAPI_PATH_TOKEN = os.environ.get("VAPI_PATH_TOKEN", "")           # secret part of the Vapi URLs
 DISPLAY_TOKEN = os.environ.get("DISPLAY_TOKEN", "")               # secret part of the demo page URL

@@ -1,0 +1,46 @@
+# Render Blueprint: New > Blueprint in the Render dashboard, pick this repo.
+# Render asks for every "sync: false" value when the service is created (copy them from server/.env).
+services:
+  - type: web
+    name: calmband
+    runtime: python
+    plan: free
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.15"
+      # PUBLIC_URL is optional here: the server falls back to Render's own https address.
+      - key: ALERT_TOKEN
+        sync: false
+      - key: DISPLAY_TOKEN
+        sync: false
+      - key: USER_NAME
+        sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_PATH_TOKEN
+        sync: false
+      - key: SUPPORT_NUMBER
+        sync: false
+      - key: APPS_SCRIPT_URL
+        sync: false
+      - key: APPS_SCRIPT_SECRET
+        sync: false
+      - key: THERAPIST_EMAIL
+        sync: false
+      - key: FRIEND_EMAIL
+        sync: false
+      - key: CALL_WAIT_SEC
+        value: "600"
+      - key: MAX_CALL_SEC
+        value: "420"
+      - key: MAX_ALERTS_PER_DAY
+        value: "10"

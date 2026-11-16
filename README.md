@@ -80,6 +80,21 @@ the last 12 turns are sent to the AI per reply.
 
 Without Gmail settings, emails run in DRY RUN mode (logged, not sent).
 
+### Host it on Render (free, permanent URL)
+1. Push this repo to GitHub. In the Render dashboard: New > Blueprint, pick the repo. It reads
+   `render.yaml` (Python web service, `server/` folder, free plan).
+2. Render asks for each secret; copy them from `server/.env`. `PUBLIC_URL` isn't needed: the
+   server uses Render's own `https://<name>.onrender.com` address.
+3. When it's live, check `https://<name>.onrender.com/health`, then open `/live`.
+4. Point Vapi at it: in your local `server/.env` set `PUBLIC_URL=https://<name>.onrender.com`
+   and run `python setup_vapi.py`.
+5. Put the same URL in `source/Config.mc`, rebuild and copy to the watch. It never changes again.
+
+Free services sleep after ~15 minutes without requests and take ~1 minute to wake. The watch
+sends its state every 2 s, so it stays awake while the app runs; open `/live` a minute before a
+demo. Episodes are kept in memory, so a restart or sleep clears them. `/live` is public on a
+guessable address; use `/display/<DISPLAY_TOKEN>` if that matters.
+
 ### Accounts needed (free)
 - **Vapi** (vapi.ai): sign up ($5 credit), create the free phone number, copy the private API key.
 - **Gmail**: turn on 2-step verification, then create an app password (Google Account -> Security
